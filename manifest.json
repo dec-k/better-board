@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Better Board",
+  "version": "0.1.0",
+  "description": "Adds a team-member filter row and status column toggles to GitHub Projects board views.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://github.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Better Board"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
