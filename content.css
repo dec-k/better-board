@@ -2,6 +2,18 @@
   display: none !important;
 }
 
+/* Sub-issues drawn beneath their parent card. The cards themselves are
+   reordered with flex `order`, so this only supplies the indent and the spine.
+   A board card carries no border of its own — its edge is a box-shadow — and
+   both its pseudo-elements are already GitHub's status sash, so border-left is
+   the one hook here that collides with nothing. */
+[data-bb-child] {
+  margin-left: 22px;
+  border-left: 3px solid var(--borderColor-emphasis, #818b98);
+  border-top-left-radius: 2px;
+  border-bottom-left-radius: 2px;
+}
+
 #better-board-bar {
   display: flex;
   flex-direction: column;

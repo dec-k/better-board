@@ -5,8 +5,13 @@ controls the built-in UI makes you dig through menus for:
 
 - **Team row** — every person assigned to something on this board, as avatar chips directly
   under the filter bar. Click one to filter to them; click again to clear.
-  Cmd/Ctrl/Shift-click to select several at once.
+  Cmd/Ctrl/Shift-click to select several at once. Each chip carries a count of the items
+  assigned to that person **in the columns currently shown**, so hiding Done and Canceled turns
+  the row into a read on active work.
 - **Column toggles** — one chip per board column. Click to hide or show that column.
+- **Sub-issue nesting** — where a sub-issue and its parent are both on the board in the same
+  column, the sub-issue is drawn indented beneath its parent instead of sitting somewhere else
+  in the column. No swimlanes or group-by required.
 
 Both controls drive the page itself: the team row writes into GitHub's own filter input, so the
 URL, the item counts and the Save/Discard buttons all behave exactly as if you had typed the
@@ -41,6 +46,16 @@ selection is reflected in the filter query, so it also survives sharing the URL.
 
 The team list is built from the assignees on the board's items — it grows as more items load and
 never shrinks while you filter, so you can always click your way back to someone.
+
+Counts come from the item data GitHub embeds in the page, which only covers the first page of
+each column. On a board large enough to page, the counts are floors and are shown as `N+`;
+someone discovered from a card avatar rather than that payload gets no number at all rather than
+a wrong one.
+
+Sub-issue nesting reorders cards with flex `order` and never moves a DOM node, so GitHub's
+drag-and-drop and its own rendering are left alone. Only children sharing a column with their
+parent are nested — pulling a card into a column it isn't in would misstate its status — and
+because the reorder is visual, keyboard and screen-reader order follow the original DOM.
 
 ## Layout
 
