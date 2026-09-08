@@ -1,9 +1,12 @@
+// Firefox exposes the promise-based APIs as `browser`; Chrome and Edge as `chrome`.
+const ext = globalThis.browser ?? globalThis.chrome;
+
 const checkbox = document.getElementById('enabled');
 
-chrome.storage.sync.get({ enabled: true }).then(({ enabled }) => {
+ext.storage.sync.get({ enabled: true }).then(({ enabled }) => {
   checkbox.checked = enabled;
 });
 
 checkbox.addEventListener('change', () => {
-  chrome.storage.sync.set({ enabled: checkbox.checked });
+  ext.storage.sync.set({ enabled: checkbox.checked });
 });

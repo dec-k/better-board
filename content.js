@@ -4,6 +4,10 @@
   const BAR_ID = 'better-board-bar';
   const HIDDEN_ATTR = 'data-bb-hidden';
 
+  // Firefox exposes the promise-based APIs as `browser`; Chrome and Edge as
+  // `chrome`. Both return promises for the storage calls used here.
+  const ext = globalThis.browser ?? globalThis.chrome;
+
   // GitHub ships hashed CSS-module class names. The module *prefix* is stable
   // across builds; the trailing hash is not. Match on prefix only.
   const SEL = {
@@ -32,7 +36,7 @@
 
   async function loadState() {
     state.projectKey = projectKey();
-    const { enabled = true, projects = {} } = await chrome.storage.sync.get(['enabled', 'projects']);
+    const { enabled = true, projects = {} } = await ext.storage.sync.get(['enabled', 'projects']);
     state.enabled = enabled;
     const saved = projects[state.projectKey] || {};
     state.assignees = new Set(saved.assignees || []);
@@ -40,12 +44,12 @@
   }
 
   async function saveState() {
-    const { projects = {} } = await chrome.storage.sync.get('projects');
+    const { projects = {} } = await ext.storage.sync.get('projects');
     projects[state.projectKey] = {
       assignees: [...state.assignees],
       hiddenColumns: [...state.hiddenColumns]
     };
-    await chrome.storage.sync.set({ projects });
+    await ext.storage.sync.set({ projects });
   }
 
   // ------------------------------------------------------------ page data
@@ -172,13 +176,18 @@
     const next = buildQuery(input.value, [...state.assignees]);
     if (next.trim() === input.value.trim()) return;
 
+    // React overrides `value` on the element itself to track changes; going
+    // through the native setter is what makes React notice the new query.
+    // (Firefox content scripts already bypass that override via Xray vision,
+    // but the descriptor is available there too, so one path covers both.)
     const setValue = Object.getOwnPropertyDescriptor(
       window.HTMLInputElement.prototype,
       'value'
-    ).set;
+    );
 
     input.focus();
-    setValue.call(input, next);
+    if (setValue && setValue.set) setValue.set.call(input, next);
+    else input.value = next;
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
     const key = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
@@ -386,7 +395,7 @@
     });
   }
 
-  chrome.storage.onChanged.addListener((changes) => {
+  ext.storage.onChanged.addListener((changes) => {
     if (changes.enabled) {
       state.enabled = changes.enabled.newValue;
       refresh();

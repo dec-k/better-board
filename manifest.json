@@ -4,7 +4,15 @@
   "version": "0.1.0",
   "description": "Adds a team-member filter row and status column toggles to GitHub Projects board views.",
   "permissions": ["storage"],
-  "host_permissions": ["https://github.com/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "better-board@dec.keighley",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Better Board"

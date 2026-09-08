@@ -14,9 +14,22 @@ query by hand. Column visibility is purely local to your browser.
 
 ## Install
 
+**Chrome / Edge**
+
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Choose **Load unpacked** and select this directory.
+
+**Firefox** (140+; the manifest asks for 142+)
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Choose **Load Temporary Add-on** and select `manifest.json`.
+
+Or, with [`web-ext`](https://github.com/mozilla/web-ext) installed:
+
+```
+npx web-ext run
+```
 
 Open any GitHub Projects board view and the bar appears below the filter input. Toggle the whole
 thing off from the extension's popup.
@@ -41,3 +54,9 @@ never shrinks while you filter, so you can always click your way back to someone
 `content.js` matches GitHub's hashed CSS-module class names by module prefix (the trailing hash
 changes between GitHub deploys, the prefix does not). If GitHub renames a module, the selectors
 in `SEL` at the top of the file are the only thing to update.
+
+Both browsers run the same code. Firefox exposes the promise-based extension APIs as `browser`
+and Chrome as `chrome`, so `content.js` and `popup.js` each pick whichever exists. There is no
+build step and no polyfill dependency.
+
+`npx web-ext lint` should stay clean — it is the only check this repo has.
