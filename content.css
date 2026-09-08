@@ -6,7 +6,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 8px 0 4px;
+  /* Horizontal margins are overwritten from the anchor's own padding. */
+  margin: 0 16px 8px;
   padding: 8px 10px;
   border: 1px solid var(--borderColor-default, #d1d9e0);
   border-radius: 8px;
@@ -57,6 +58,24 @@
   background: var(--bgColor-accent-muted, #ddf4ff);
   color: var(--fgColor-accent, #0969da);
   font-weight: 600;
+}
+
+#better-board-bar .bb-count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--bgColor-neutral-muted, #eff2f5);
+  color: var(--fgColor-muted, #59636e);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+}
+
+#better-board-bar .bb-chip[aria-pressed='true'] .bb-count {
+  background: var(--bgColor-accent-emphasis, #0969da);
+  color: var(--fgColor-onEmphasis, #ffffff);
 }
 
 #better-board-bar .bb-avatar {

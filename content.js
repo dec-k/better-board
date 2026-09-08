@@ -65,37 +65,50 @@
   }
 
   // The embedded payload is large and never changes after load, so parse it once.
-  let payloadCache = { source: null, members: null };
+  let payloadCache = { source: null, members: null, complete: true, openItems: 0 };
 
-  function membersFromPayload() {
+  function readPayload() {
     const el = document.getElementById('memex-paginated-items-data');
     const source = el ? el.textContent : '';
-    if (payloadCache.source === source) return payloadCache.members;
+    if (payloadCache.source === source) return payloadCache;
 
     const byLogin = new Map();
     const data = readJSON('memex-paginated-items-data');
     const groups = data ? data.groupedItems || (data.nodes ? [{ nodes: data.nodes }] : []) : [];
+
+    // The board only server-renders the first page of each column. When more
+    // is waiting, every count below is a floor rather than a total.
+    let complete = true;
+    let openItems = 0;
+
     for (const group of groups) {
+      if (group.pageInfo && group.pageInfo.hasNextPage) complete = false;
       for (const node of group.nodes || []) {
+        const open = node.state !== 'closed';
+        if (open) openItems++;
         const field = (node.memexProjectColumnValues || [])
           .find((v) => v.memexProjectColumnId === 'Assignees');
         for (const user of (field && field.value) || []) {
           if (!user || !user.login) continue;
-          const existing = byLogin.get(user.login);
-          if (existing) existing.count++;
-          else
-            byLogin.set(user.login, {
+          let member = byLogin.get(user.login);
+          if (!member) {
+            member = {
               login: user.login,
               name: user.name || user.login,
               avatarUrl: user.avatarUrl,
-              count: 1
-            });
+              count: 0,
+              seen: 0
+            };
+            byLogin.set(user.login, member);
+          }
+          member.seen++;
+          if (open) member.count++;
         }
       }
     }
 
-    payloadCache = { source, members: byLogin };
-    return byLogin;
+    payloadCache = { source, members: byLogin, complete, openItems };
+    return payloadCache;
   }
 
   // Members accumulate rather than being recomputed: filtering the board unmounts
@@ -103,17 +116,19 @@
   let seenMembers = new Map();
 
   function readMembers() {
-    for (const [login, member] of membersFromPayload()) {
+    for (const [login, member] of readPayload().members) {
       if (!seenMembers.has(login)) seenMembers.set(login, member);
     }
 
-    // Items loaded after the initial payload only exist in the DOM.
+    // Items loaded after the initial payload only exist in the DOM. We know
+    // these people are on the board but not how much they hold, so `seen` stays
+    // 0 and their chip shows no number rather than a wrong one.
     for (const img of document.querySelectorAll(
       `${SEL.boardView} img[src*="avatars.githubusercontent.com"]`
     )) {
       const login = (img.getAttribute('alt') || '').replace(/^@/, '').trim();
       if (login && !seenMembers.has(login)) {
-        seenMembers.set(login, { login, name: login, avatarUrl: img.src, count: 0 });
+        seenMembers.set(login, { login, name: login, avatarUrl: img.src, count: 0, seen: 0 });
       }
     }
 
@@ -227,7 +242,7 @@
 
   // ---------------------------------------------------------------- render
 
-  function chip({ label, active, onClick, avatar, title }) {
+  function chip({ label, active, onClick, avatar, title, count }) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'bb-chip';
@@ -243,6 +258,12 @@
     const span = document.createElement('span');
     span.textContent = label;
     button.append(span);
+    if (count != null) {
+      const badge = document.createElement('span');
+      badge.className = 'bb-count';
+      badge.textContent = count;
+      button.append(badge);
+    }
     button.addEventListener('click', onClick);
     return button;
   }
@@ -261,8 +282,14 @@
     }
 
     const columnNames = readColumnNames();
+    const { complete, openItems } = readPayload();
+
+    // A count we can only prove is a floor gets a "+" rather than a flat number.
+    const more = complete ? '' : '+';
+    const countOf = (member) => (member.seen ? `${member.count}${more}` : null);
+
     const signature = JSON.stringify([
-      state.members.map((m) => m.login),
+      state.members.map((m) => `${m.login}:${countOf(m)}`),
       columnNames,
       [...state.assignees].sort(),
       [...state.hiddenColumns].sort()
@@ -273,6 +300,12 @@
     const bar = existing || document.createElement('div');
     bar.id = BAR_ID;
     bar.replaceChildren();
+
+    // Line the bar up with the filter input above and the columns below, both
+    // of which are inset by their container's own horizontal padding.
+    const anchorPadding = getComputedStyle(anchor);
+    bar.style.marginLeft = anchorPadding.paddingLeft;
+    bar.style.marginRight = anchorPadding.paddingRight;
 
     // --- team members
     const people = document.createElement('div');
@@ -287,6 +320,8 @@
       chip({
         label: 'Everyone',
         active: state.assignees.size === 0,
+        count: openItems ? `${openItems}${more}` : null,
+        title: `${openItems}${more} open item${openItems === 1 ? '' : 's'} on this board`,
         onClick: () => {
           state.assignees.clear();
           applyAssigneeFilter();
@@ -297,10 +332,15 @@
     );
 
     for (const member of state.members) {
+      const who =
+        member.name === member.login ? member.login : `${member.name} (${member.login})`;
       people.append(
         chip({
           label: member.login,
-          title: member.name === member.login ? member.login : `${member.name} (${member.login})`,
+          count: countOf(member),
+          title: member.seen
+            ? `${who} — ${member.count}${more} open of ${member.seen}${more} assigned on this board`
+            : `${who} — assigned on this board`,
           avatar: member.avatarUrl,
           active: state.assignees.has(member.login),
           onClick: (event) => {
