@@ -5,7 +5,6 @@
 Absolutely no external API calls are made, no data leaves your browser. This only reads DOM data that GitHub already has - and reframes it for convenience.
 
 ![alt text](image.png)
-![alt text](image-1.png)
 
 ## Install
 
