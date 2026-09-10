@@ -1,4 +1,5 @@
-[data-bb-hidden] {
+[data-bb-hidden],
+[data-bb-standup-hidden] {
   display: none !important;
 }
 
@@ -95,4 +96,59 @@
   height: 18px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+#better-board-bar .bb-standup-toggle {
+  margin-left: auto;
+}
+
+#better-board-bar .bb-standup-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+#better-board-bar .bb-standup-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+#better-board-bar .bb-standup-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#better-board-bar .bb-standup-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fgColor-default, #1f2328);
+}
+
+#better-board-bar .bb-standup-meta {
+  color: var(--fgColor-muted, #59636e);
+  font-size: 11px;
+}
+
+#better-board-bar .bb-standup-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 50%;
+  background: var(--bgColor-default, #ffffff);
+  color: var(--fgColor-default, #1f2328);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#better-board-bar .bb-standup-nav:hover {
+  background: var(--bgColor-neutral-muted, #eff2f5);
 }

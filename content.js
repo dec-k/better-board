@@ -4,6 +4,7 @@
   const BAR_ID = 'better-board-bar';
   const HIDDEN_ATTR = 'data-bb-hidden';
   const CHILD_ATTR = 'data-bb-child';
+  const STANDUP_HIDDEN_ATTR = 'data-bb-standup-hidden';
 
   // Firefox exposes the promise-based APIs as `browser`; Chrome and Edge as
   // `chrome`. Both return promises for the storage calls used here.
@@ -20,7 +21,10 @@
     filterForm: '#filter-bar-component',
     filterRow: '[class*="base-project-view-filter-input-module__Box"]',
     dropZone: '.column-drop-zone',
-    card: '[data-board-card-id]'
+    card: '[data-board-card-id]',
+    // Primer's tab components apply this role regardless of the hashed class
+    // names used for everything else, so it survives GitHub's rebuilds.
+    tabs: '[role="tablist"]'
   };
 
   const state = {
@@ -28,7 +32,9 @@
     assignees: new Set(),
     hiddenColumns: new Set(),
     members: [],
-    projectKey: null
+    projectKey: null,
+    standup: false,
+    standupIndex: 0
   };
 
   // ---------------------------------------------------------------- storage
@@ -361,6 +367,88 @@
     return null;
   }
 
+  // -------------------------------------------------------- standup mode
+
+  // Finds the ancestor of `markerEl` that sits at the same nesting depth as
+  // `referenceEl`'s subtree — i.e. the whole block containing the marker,
+  // stopping at their nearest common ancestor. This lets the tab bar be hidden
+  // without knowing its exact wrapper, since only the tablist itself has a
+  // dependable selector.
+  function findSectionToHide(markerEl, referenceEl) {
+    const refPath = new Set();
+    for (let n = referenceEl; n; n = n.parentElement) refPath.add(n);
+    for (let n = markerEl; n && n.parentElement; n = n.parentElement) {
+      if (refPath.has(n.parentElement)) return n;
+    }
+    return markerEl;
+  }
+
+  let standupHiddenEls = [];
+
+  function applyStandupChrome() {
+    for (const el of standupHiddenEls) el.removeAttribute(STANDUP_HIDDEN_ATTR);
+    standupHiddenEls = [];
+    if (!state.standup) return;
+
+    const anchor = document.querySelector(SEL.filterRow) || document.querySelector(SEL.filterForm);
+    if (!anchor) return;
+
+    const toHide = [anchor];
+    const tablist = document.querySelector(SEL.tabs);
+    if (tablist) toHide.push(findSectionToHide(tablist, anchor));
+
+    for (const el of toHide) {
+      el.setAttribute(STANDUP_HIDDEN_ATTR, '');
+      standupHiddenEls.push(el);
+    }
+  }
+
+  function applyStandupSelection() {
+    const member = state.members[state.standupIndex];
+    if (!member) return;
+    state.assignees = new Set([member.login]);
+    applyAssigneeFilter();
+  }
+
+  function enterStandup() {
+    if (!state.members.length) return;
+    const current = [...state.assignees][0];
+    const idx = state.members.findIndex((m) => m.login === current);
+    state.standupIndex = idx >= 0 ? idx : 0;
+    state.standup = true;
+    applyStandupSelection();
+    applyStandupChrome();
+    renderBar({ force: true });
+  }
+
+  function exitStandup() {
+    state.standup = false;
+    applyStandupChrome();
+    renderBar({ force: true });
+  }
+
+  function standupStep(delta) {
+    if (!state.members.length) return;
+    const count = state.members.length;
+    state.standupIndex = (state.standupIndex + delta + count) % count;
+    applyStandupSelection();
+    renderBar({ force: true });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (!state.standup) return;
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+
+    if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      standupStep(1);
+    } else if (event.key === 'Escape') {
+      exitStandup();
+    }
+  });
+
   // ----------------------------------------------------- column visibility
 
   function applyColumnVisibility() {
@@ -426,7 +514,9 @@
       state.members.map((m) => `${m.login}:${countOf(m)}`),
       columnNames,
       [...state.assignees].sort(),
-      [...state.hiddenColumns].sort()
+      [...state.hiddenColumns].sort(),
+      state.standup,
+      state.standupIndex
     ]);
     if (!force && existing && signature === lastSignature) return;
     lastSignature = signature;
@@ -445,62 +535,122 @@
     const people = document.createElement('div');
     people.className = 'bb-row';
 
-    const label = document.createElement('span');
-    label.className = 'bb-label';
-    label.textContent = 'Team';
-    people.append(label);
+    const standupToggle = document.createElement('button');
+    standupToggle.type = 'button';
+    standupToggle.className = 'bb-chip bb-standup-toggle';
+    standupToggle.textContent = state.standup ? 'Exit standup' : 'Standup mode';
+    standupToggle.disabled = !state.standup && !state.members.length;
+    standupToggle.addEventListener('click', () => {
+      if (state.standup) exitStandup();
+      else enterStandup();
+    });
 
-    people.append(
-      chip({
-        label: 'Everyone',
-        active: state.assignees.size === 0,
-        count: `${total}${more}`,
-        title: `${total}${more} item${total === 1 ? '' : 's'} in the columns currently shown`,
-        onClick: () => {
-          state.assignees.clear();
-          applyAssigneeFilter();
-          renderBar();
-          saveState();
-        }
-      })
-    );
+    if (state.standup) {
+      const member = state.members[state.standupIndex];
+      const panel = document.createElement('div');
+      panel.className = 'bb-standup-panel';
 
-    for (const member of state.members) {
-      const who =
-        member.name === member.login ? member.login : `${member.name} (${member.login})`;
+      if (member) {
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'bb-standup-nav';
+        prevBtn.textContent = '‹';
+        prevBtn.title = 'Previous person';
+        prevBtn.addEventListener('click', () => standupStep(-1));
+
+        const img = document.createElement('img');
+        img.className = 'bb-standup-avatar';
+        img.src = member.avatarUrl || '';
+        img.alt = '';
+
+        const info = document.createElement('div');
+        info.className = 'bb-standup-info';
+        const name = document.createElement('div');
+        name.className = 'bb-standup-name';
+        name.textContent = member.name && member.name !== member.login ? member.name : member.login;
+        const meta = document.createElement('div');
+        meta.className = 'bb-standup-meta';
+        meta.textContent =
+          `@${member.login} · ${state.standupIndex + 1} of ${state.members.length}` +
+          ' · press space for next';
+        info.append(name, meta);
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'bb-standup-nav';
+        nextBtn.textContent = '›';
+        nextBtn.title = 'Next person (space)';
+        nextBtn.addEventListener('click', () => standupStep(1));
+
+        panel.append(prevBtn, img, info, nextBtn);
+      } else {
+        const empty = document.createElement('span');
+        empty.className = 'bb-empty';
+        empty.textContent = 'No assignees found on this board yet.';
+        panel.append(empty);
+      }
+
+      people.append(panel, standupToggle);
+    } else {
+      const label = document.createElement('span');
+      label.className = 'bb-label';
+      label.textContent = 'Team';
+      people.append(label);
+
       people.append(
         chip({
-          label: member.login,
-          count: countOf(member),
-          title: member.fromPayload
-            ? `${who} — ${counts.get(member.login) || 0}${more} assigned in the columns currently shown`
-            : `${who} — assigned on this board`,
-          avatar: member.avatarUrl,
-          active: state.assignees.has(member.login),
-          onClick: (event) => {
-            // Plain click selects one person; modifier-click builds a set.
-            const additive = event.metaKey || event.ctrlKey || event.shiftKey;
-            if (additive) {
-              if (state.assignees.has(member.login)) state.assignees.delete(member.login);
-              else state.assignees.add(member.login);
-            } else if (state.assignees.size === 1 && state.assignees.has(member.login)) {
-              state.assignees.clear();
-            } else {
-              state.assignees = new Set([member.login]);
-            }
+          label: 'Everyone',
+          active: state.assignees.size === 0,
+          count: `${total}${more}`,
+          title: `${total}${more} item${total === 1 ? '' : 's'} in the columns currently shown`,
+          onClick: () => {
+            state.assignees.clear();
             applyAssigneeFilter();
             renderBar();
             saveState();
           }
         })
       );
-    }
 
-    if (!state.members.length) {
-      const empty = document.createElement('span');
-      empty.className = 'bb-empty';
-      empty.textContent = 'No assignees found on this board yet.';
-      people.append(empty);
+      for (const member of state.members) {
+        const who =
+          member.name === member.login ? member.login : `${member.name} (${member.login})`;
+        people.append(
+          chip({
+            label: member.login,
+            count: countOf(member),
+            title: member.fromPayload
+              ? `${who} — ${counts.get(member.login) || 0}${more} assigned in the columns currently shown`
+              : `${who} — assigned on this board`,
+            avatar: member.avatarUrl,
+            active: state.assignees.has(member.login),
+            onClick: (event) => {
+              // Plain click selects one person; modifier-click builds a set.
+              const additive = event.metaKey || event.ctrlKey || event.shiftKey;
+              if (additive) {
+                if (state.assignees.has(member.login)) state.assignees.delete(member.login);
+                else state.assignees.add(member.login);
+              } else if (state.assignees.size === 1 && state.assignees.has(member.login)) {
+                state.assignees.clear();
+              } else {
+                state.assignees = new Set([member.login]);
+              }
+              applyAssigneeFilter();
+              renderBar();
+              saveState();
+            }
+          })
+        );
+      }
+
+      if (!state.members.length) {
+        const empty = document.createElement('span');
+        empty.className = 'bb-empty';
+        empty.textContent = 'No assignees found on this board yet.';
+        people.append(empty);
+      }
+
+      people.append(standupToggle);
     }
 
     // --- columns
@@ -562,12 +712,17 @@
       refreshTimer = null;
       if (projectKey() !== state.projectKey) {
         seenMembers = new Map();
+        state.standup = false;
+        state.standupIndex = 0;
+        standupHiddenEls = [];
         loadState().then(refresh);
         return;
       }
       state.members = readMembers();
+      if (!state.enabled) state.standup = false;
       renderBar();
       applyColumnVisibility();
+      applyStandupChrome();
       applySubIssueNesting();
       syncAssigneesFromQuery();
     }, 50);
@@ -576,6 +731,7 @@
   ext.storage.onChanged.addListener((changes) => {
     if (changes.enabled) {
       state.enabled = changes.enabled.newValue;
+      if (!state.enabled) state.standup = false;
       refresh();
     }
   });
@@ -589,6 +745,7 @@
       const external = records.some((r) => {
         if (ours && ours.contains(r.target)) return false;
         if (r.type === 'attributes' && r.attributeName === HIDDEN_ATTR) return false;
+        if (r.type === 'attributes' && r.attributeName === STANDUP_HIDDEN_ATTR) return false;
         return true;
       });
       if (external) refresh();
@@ -597,7 +754,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: [HIDDEN_ATTR]
+      attributeFilter: [HIDDEN_ATTR, STANDUP_HIDDEN_ATTR]
     });
   });
 })();
