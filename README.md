@@ -1,23 +1,15 @@
-# Better Board
+# better-board
 
-A Chrome/Edge extension that rewrites the GitHub Projects **board** view in place, adding two
-controls the built-in UI makes you dig through menus for:
+**better-board** is a browser extension aimed at making Github Project Boards simpler to navigate for people in a rush. It is a lightweight DOM injector that adds in custom assignee and column filters that are more readily surfaced. It also supports a minimal _Standup Mode_ to quickly tab through people on large projects.
 
-- **Team row** — every person assigned to something on this board, as avatar chips directly
-  under the filter bar. Click one to filter to them; click again to clear.
-  Cmd/Ctrl/Shift-click to select several at once. Each chip carries a count of the items
-  assigned to that person **in the columns currently shown**, so hiding Done and Canceled turns
-  the row into a read on active work.
-- **Column toggles** — one chip per board column. Click to hide or show that column.
-- **Sub-issue nesting** — where a sub-issue and its parent are both on the board in the same
-  column, the sub-issue is drawn indented beneath its parent instead of sitting somewhere else
-  in the column. No swimlanes or group-by required.
+Absolutely no external API calls are made, no data leaves your browser. This only reads DOM data that GitHub already has - and reframes it for convenience.
 
-Both controls drive the page itself: the team row writes into GitHub's own filter input, so the
-URL, the item counts and the Save/Discard buttons all behave exactly as if you had typed the
-query by hand. Column visibility is purely local to your browser.
+![alt text](image.png)
+![alt text](image-1.png)
 
 ## Install
+
+**Currently, the plugin is not publically published, and must be installed as a loose/debug addon in your respective browser.**
 
 **Chrome / Edge**
 
