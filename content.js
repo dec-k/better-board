@@ -436,6 +436,11 @@
   }
 
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && columnsMenuOpen) {
+      columnsMenuOpen = false;
+      renderBar({ force: true });
+    }
+
     if (!state.standup) return;
     const active = document.activeElement;
     const tag = active && active.tagName;
@@ -490,6 +495,7 @@
   }
 
   let lastSignature = null;
+  let columnsMenuOpen = false;
 
   function renderBar({ force = false } = {}) {
     const anchor = document.querySelector(SEL.filterRow) || document.querySelector(SEL.filterForm);
@@ -516,7 +522,8 @@
       [...state.assignees].sort(),
       [...state.hiddenColumns].sort(),
       state.standup,
-      state.standupIndex
+      state.standupIndex,
+      columnsMenuOpen
     ]);
     if (!force && existing && signature === lastSignature) return;
     lastSignature = signature;
@@ -537,10 +544,21 @@
 
     const standupToggle = document.createElement('button');
     standupToggle.type = 'button';
-    standupToggle.className = 'bb-chip bb-standup-toggle';
-    standupToggle.textContent = state.standup ? 'Exit standup' : 'Standup mode';
+    standupToggle.className = 'bb-standup-toggle';
+    standupToggle.classList.toggle('bb-standup-toggle--active', state.standup);
     standupToggle.disabled = !state.standup && !state.members.length;
+
+    const standupIcon = document.createElement('span');
+    standupIcon.className = 'bb-standup-toggle-icon';
+    standupIcon.textContent = state.standup ? '■' : '▶';
+    standupIcon.setAttribute('aria-hidden', 'true');
+
+    const standupText = document.createElement('span');
+    standupText.textContent = state.standup ? 'Exit standup' : 'Standup mode';
+
+    standupToggle.append(standupIcon, standupText);
     standupToggle.addEventListener('click', () => {
+      columnsMenuOpen = false;
       if (state.standup) exitStandup();
       else enterStandup();
     });
@@ -657,47 +675,77 @@
     const columns = document.createElement('div');
     columns.className = 'bb-row';
 
-    const columnLabel = document.createElement('span');
-    columnLabel.className = 'bb-label';
-    columnLabel.textContent = 'Columns';
-    columns.append(columnLabel);
+    const dropdown = document.createElement('div');
+    dropdown.className = 'bb-dropdown';
+
+    const hiddenCount = state.hiddenColumns.size;
+    const dropdownToggle = document.createElement('button');
+    dropdownToggle.type = 'button';
+    dropdownToggle.className = 'bb-chip bb-dropdown-toggle';
+    dropdownToggle.setAttribute('aria-expanded', String(columnsMenuOpen));
+    dropdownToggle.textContent = hiddenCount ? `Columns (${hiddenCount} hidden)` : 'Columns';
+    dropdownToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      columnsMenuOpen = !columnsMenuOpen;
+      renderBar({ force: true });
+    });
+
+    const menu = document.createElement('div');
+    menu.className = 'bb-dropdown-menu';
+    if (!columnsMenuOpen) menu.hidden = true;
 
     for (const name of columnNames) {
       const visible = !state.hiddenColumns.has(name);
-      columns.append(
-        chip({
-          label: name,
-          active: visible,
-          title: visible ? `Hide "${name}"` : `Show "${name}"`,
-          onClick: () => {
-            if (visible) state.hiddenColumns.add(name);
-            else state.hiddenColumns.delete(name);
-            applyColumnVisibility();
-            renderBar();
-            saveState();
-          }
-        })
-      );
+      const item = document.createElement('label');
+      item.className = 'bb-dropdown-item';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = visible;
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.hiddenColumns.delete(name);
+        else state.hiddenColumns.add(name);
+        applyColumnVisibility();
+        renderBar({ force: true });
+        saveState();
+      });
+
+      const label = document.createElement('span');
+      label.textContent = name;
+
+      item.append(checkbox, label);
+      menu.append(item);
     }
 
     if (state.hiddenColumns.size) {
-      columns.append(
-        chip({
-          label: 'Show all',
-          active: false,
-          onClick: () => {
-            state.hiddenColumns.clear();
-            applyColumnVisibility();
-            renderBar();
-            saveState();
-          }
-        })
-      );
+      const showAll = document.createElement('button');
+      showAll.type = 'button';
+      showAll.className = 'bb-dropdown-showall';
+      showAll.textContent = 'Show all';
+      showAll.addEventListener('click', () => {
+        state.hiddenColumns.clear();
+        applyColumnVisibility();
+        renderBar({ force: true });
+        saveState();
+      });
+      menu.append(showAll);
     }
+
+    dropdown.append(dropdownToggle, menu);
+    columns.append(dropdown);
 
     bar.append(people, columns);
     if (!existing) anchor.insertAdjacentElement('afterend', bar);
   }
+
+  document.addEventListener('click', (event) => {
+    if (!columnsMenuOpen) return;
+    const dropdown = document.querySelector('#better-board-bar .bb-dropdown');
+    if (!dropdown || !dropdown.contains(event.target)) {
+      columnsMenuOpen = false;
+      renderBar({ force: true });
+    }
+  });
 
   // ----------------------------------------------------------------- boot
 
