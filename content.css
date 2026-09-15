@@ -32,6 +32,13 @@
   font-size: 13px;
 }
 
+/* Standup hides GitHub's own filter row, which is what the bar normally sits
+   under — without that spacer it would butt straight up against the section
+   above, so it carries its own while the mode is on. */
+#better-board-bar.bb-standup {
+  margin-top: 8px;
+}
+
 #better-board-bar .bb-row {
   display: flex;
   flex-wrap: wrap;
@@ -45,16 +52,6 @@
   align-items: center;
   gap: 12px;
   margin-left: auto;
-}
-
-#better-board-bar .bb-label {
-  margin-right: 4px;
-  color: var(--fgColor-muted, #59636e);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 #better-board-bar .bb-empty {
@@ -94,6 +91,34 @@
   background: var(--bgColor-accent-muted, #ddf4ff);
   color: var(--fgColor-accent, #0969da);
   font-weight: 600;
+}
+
+/* Standup keeps the whole team visible, so everyone but the person speaking
+   is muted rather than faded — opacity would take the tick down with it. */
+#better-board-bar .bb-chip--dim {
+  border-color: var(--borderColor-muted, #d8dee4);
+  background: var(--bgColor-muted, #f6f8fa);
+  color: var(--fgColor-muted, #59636e);
+}
+
+#better-board-bar .bb-chip--dim .bb-avatar {
+  opacity: 0.55;
+}
+
+#better-board-bar .bb-chip--dim:hover {
+  border-color: var(--borderColor-default, #d1d9e0);
+  background: var(--bgColor-neutral-muted, #eff2f5);
+  color: var(--fgColor-default, #1f2328);
+}
+
+#better-board-bar .bb-chip--dim:hover .bb-avatar {
+  opacity: 1;
+}
+
+#better-board-bar .bb-check {
+  color: var(--fgColor-success, #1a7f37);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 #better-board-bar .bb-count {
@@ -231,22 +256,34 @@
   margin: 0;
 }
 
-#better-board-bar .bb-dropdown-showall {
-  margin-top: 4px;
+#better-board-bar .bb-dropdown-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--borderColor-muted, #d1d9e0);
+}
+
+#better-board-bar .bb-dropdown-action {
+  flex: 1;
   padding: 5px 6px;
-  border: none;
-  border-top: 1px solid var(--borderColor-muted, #d1d9e0);
-  border-radius: 0;
-  background: none;
-  color: var(--fgColor-accent, #0969da);
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  background: var(--bgColor-default, #ffffff);
+  color: var(--fgColor-default, #1f2328);
   font: inherit;
+  font-size: 12px;
   font-weight: 600;
-  text-align: left;
   cursor: pointer;
 }
 
-#better-board-bar .bb-dropdown-showall:hover {
-  background: var(--bgColor-accent-muted, #ddf4ff);
+#better-board-bar .bb-dropdown-action:hover:not(:disabled) {
+  background: var(--bgColor-neutral-muted, #eff2f5);
+}
+
+#better-board-bar .bb-dropdown-action:disabled {
+  color: var(--fgColor-disabled, #8c959f);
+  cursor: not-allowed;
 }
 
 /* --------------------------------------------------------- mode switch */
@@ -305,50 +342,9 @@
 
 /* ------------------------------------------------------- standup active */
 
-#better-board-bar .bb-standup-person {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 12px 0 5px;
-  border: 1px solid var(--borderColor-accent-emphasis, #0969da);
-  border-radius: 999px;
-  background: var(--bgColor-accent-emphasis, #0969da);
-  color: var(--fgColor-onEmphasis, #ffffff);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-#better-board-bar .bb-standup-avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  flex-shrink: 0;
-}
-
 #better-board-bar .bb-standup-meta {
+  margin-left: 2px;
   color: var(--fgColor-muted, #59636e);
   font-size: 13px;
-}
-
-#better-board-bar .bb-standup-nav {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--borderColor-default, #d1d9e0);
-  border-radius: 6px;
-  background: var(--bgColor-default, #ffffff);
-  color: var(--fgColor-default, #1f2328);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-#better-board-bar .bb-standup-nav:hover {
-  background: var(--bgColor-neutral-muted, #eff2f5);
+  white-space: nowrap;
 }

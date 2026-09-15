@@ -34,7 +34,10 @@
     members: [],
     projectKey: null,
     standup: false,
-    standupIndex: 0
+    standupIndex: 0,
+    // Who has already spoken. Ephemeral: a standup starts from a clean slate,
+    // so this is never written to storage.
+    standupDone: new Set()
   };
 
   // ---------------------------------------------------------------- storage
@@ -416,6 +419,7 @@
     const idx = state.members.findIndex((m) => m.login === current);
     state.standupIndex = idx >= 0 ? idx : 0;
     state.standup = true;
+    state.standupDone = new Set();
     applyStandupSelection();
     applyStandupChrome();
     renderBar({ force: true });
@@ -424,6 +428,37 @@
   function exitStandup() {
     state.standup = false;
     applyStandupChrome();
+    renderBar({ force: true });
+  }
+
+  function standupJump(index) {
+    if (!state.members[index]) return;
+    state.standupIndex = index;
+    applyStandupSelection();
+    renderBar({ force: true });
+  }
+
+  function standupToggleDone(login) {
+    if (state.standupDone.has(login)) state.standupDone.delete(login);
+    else state.standupDone.add(login);
+    renderBar({ force: true });
+  }
+
+  // Space is the standup's one-handed control: this person has spoken, move on
+  // to the next who hasn't. Everyone done leaves the selection where it is.
+  function standupMarkDoneAndAdvance() {
+    const member = state.members[state.standupIndex];
+    if (!member) return;
+    state.standupDone.add(member.login);
+
+    const count = state.members.length;
+    for (let step = 1; step <= count; step++) {
+      const idx = (state.standupIndex + step) % count;
+      if (!state.standupDone.has(state.members[idx].login)) {
+        standupJump(idx);
+        return;
+      }
+    }
     renderBar({ force: true });
   }
 
@@ -446,7 +481,10 @@
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
 
-    if (event.code === 'Space' || event.key === ' ' || event.key === 'ArrowRight') {
+    if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      standupMarkDoneAndAdvance();
+    } else if (event.key === 'ArrowRight') {
       event.preventDefault();
       standupStep(1);
     } else if (event.key === 'ArrowLeft') {
@@ -471,10 +509,13 @@
 
   // ---------------------------------------------------------------- render
 
-  function chip({ label, active, onClick, avatar, title, count }) {
+  function chip({ label, active, onClick, avatar, title, count, dim, done }) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = avatar ? 'bb-chip bb-chip--avatar' : 'bb-chip';
+    const classes = ['bb-chip'];
+    if (avatar) classes.push('bb-chip--avatar');
+    if (dim) classes.push('bb-chip--dim');
+    button.className = classes.join(' ');
     button.setAttribute('aria-pressed', String(active));
     if (title) button.title = title;
     if (avatar) {
@@ -492,6 +533,14 @@
       badge.className = 'bb-count';
       badge.textContent = count;
       button.append(badge);
+    }
+    if (done) {
+      // The tick is decoration; "done" reaches assistive tech through the title.
+      const check = document.createElement('span');
+      check.className = 'bb-check';
+      check.textContent = '✓';
+      check.setAttribute('aria-hidden', 'true');
+      button.append(check);
     }
     button.addEventListener('click', onClick);
     return button;
@@ -548,6 +597,7 @@
       [...state.hiddenColumns].sort(),
       state.standup,
       state.standupIndex,
+      [...state.standupDone].sort(),
       columnsMenuOpen
     ]);
     if (!force && existing && signature === lastSignature) return;
@@ -555,6 +605,7 @@
 
     const bar = existing || document.createElement('div');
     bar.id = BAR_ID;
+    bar.classList.toggle('bb-standup', state.standup);
     bar.replaceChildren();
 
     // Line the bar up with the filter input above and the columns below, both
@@ -567,54 +618,46 @@
     const people = document.createElement('div');
     people.className = 'bb-row';
 
-    const label = document.createElement('span');
-    label.className = 'bb-label';
-    label.textContent = state.standup ? 'Standup active' : 'Team';
-    people.append(label);
-
     if (state.standup) {
-      const member = state.members[state.standupIndex];
+      if (state.members.length) {
+        // The whole team stays on screen through the standup — everyone can see
+        // who has been and who is still to come — with only the person under
+        // discussion at full strength.
+        state.members.forEach((member, index) => {
+          const active = index === state.standupIndex;
+          const done = state.standupDone.has(member.login);
+          const who =
+            member.name && member.name !== member.login
+              ? `${member.name} (${member.login})`
+              : member.login;
 
-      if (member) {
-        const prevBtn = document.createElement('button');
-        prevBtn.type = 'button';
-        prevBtn.className = 'bb-standup-nav';
-        prevBtn.textContent = '‹';
-        prevBtn.title = 'Previous person (left arrow)';
-        prevBtn.addEventListener('click', () => standupStep(-1));
+          people.append(
+            chip({
+              label: member.login,
+              count: countOf(member),
+              avatar: member.avatarUrl,
+              active,
+              dim: !active,
+              done,
+              title: active
+                ? `${who} — ${done ? 'done; click to reopen' : 'click to mark done'}`
+                : `${who}${done ? ' — done' : ''} — click to bring up`,
+              onClick: () => {
+                if (active) standupToggleDone(member.login);
+                else standupJump(index);
+              }
+            })
+          );
+        });
 
-        const who =
-          member.name && member.name !== member.login
-            ? `${member.name} (${member.login})`
-            : member.login;
-
-        const person = document.createElement('span');
-        person.className = 'bb-standup-person';
-        person.title = who;
-
-        const img = document.createElement('img');
-        img.className = 'bb-standup-avatar';
-        img.src = member.avatarUrl || '';
-        img.alt = '';
-
-        const name = document.createElement('span');
-        name.textContent = member.login;
-        person.append(img, name);
-
-        const nextBtn = document.createElement('button');
-        nextBtn.type = 'button';
-        nextBtn.className = 'bb-standup-nav';
-        nextBtn.textContent = '›';
-        nextBtn.title = 'Next person (right arrow or space)';
-        nextBtn.addEventListener('click', () => standupStep(1));
-
+        const doneCount = state.members.filter((m) => state.standupDone.has(m.login)).length;
         const meta = document.createElement('span');
         meta.className = 'bb-standup-meta';
         meta.textContent =
-          `${state.standupIndex + 1} of ${state.members.length}` +
-          ' · ← → or space to move through the team';
-
-        people.append(prevBtn, person, nextBtn, meta);
+          doneCount === state.members.length
+            ? `all ${doneCount} done · ← → to step`
+            : `${doneCount} of ${state.members.length} done · space marks done · ← → to step`;
+        people.append(meta);
       } else {
         const empty = document.createElement('span');
         empty.className = 'bb-empty';
@@ -716,8 +759,7 @@
         dropdownToggle.append(badge);
       }
 
-      dropdownToggle.addEventListener('click', (event) => {
-        event.stopPropagation();
+      dropdownToggle.addEventListener('click', () => {
         columnsMenuOpen = !columnsMenuOpen;
         renderBar({ force: true });
       });
@@ -725,6 +767,36 @@
       const menu = document.createElement('div');
       menu.className = 'bb-dropdown-menu';
       if (!columnsMenuOpen) menu.hidden = true;
+
+      const bulk = document.createElement('div');
+      bulk.className = 'bb-dropdown-actions';
+
+      const showAll = document.createElement('button');
+      showAll.type = 'button';
+      showAll.className = 'bb-dropdown-action';
+      showAll.textContent = 'Show all';
+      showAll.disabled = !hiddenCount;
+      showAll.addEventListener('click', () => {
+        state.hiddenColumns.clear();
+        applyColumnVisibility();
+        renderBar({ force: true });
+        saveState();
+      });
+
+      const hideAll = document.createElement('button');
+      hideAll.type = 'button';
+      hideAll.className = 'bb-dropdown-action';
+      hideAll.textContent = 'Hide all';
+      hideAll.disabled = hiddenCount === columnNames.length;
+      hideAll.addEventListener('click', () => {
+        state.hiddenColumns = new Set(columnNames);
+        applyColumnVisibility();
+        renderBar({ force: true });
+        saveState();
+      });
+
+      bulk.append(showAll, hideAll);
+      menu.append(bulk);
 
       for (const name of columnNames) {
         const visible = !state.hiddenColumns.has(name);
@@ -749,19 +821,11 @@
         menu.append(item);
       }
 
-      if (hiddenCount) {
-        const showAll = document.createElement('button');
-        showAll.type = 'button';
-        showAll.className = 'bb-dropdown-showall';
-        showAll.textContent = 'Show all';
-        showAll.addEventListener('click', () => {
-          state.hiddenColumns.clear();
-          applyColumnVisibility();
-          renderBar({ force: true });
-          saveState();
-        });
-        menu.append(showAll);
-      }
+      // Every control in here re-renders the bar, which detaches the node that
+      // was clicked before the event reaches the document-level outside-click
+      // handler — so that handler would read it as a click from outside and
+      // close the menu. Stop the event at the dropdown instead, on the way up.
+      dropdown.addEventListener('click', (event) => event.stopPropagation());
 
       dropdown.append(dropdownToggle, menu);
 
