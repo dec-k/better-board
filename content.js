@@ -446,9 +446,12 @@
     const tag = active && active.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
 
-    if (event.code === 'Space' || event.key === ' ') {
+    if (event.code === 'Space' || event.key === ' ' || event.key === 'ArrowRight') {
       event.preventDefault();
       standupStep(1);
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      standupStep(-1);
     } else if (event.key === 'Escape') {
       exitStandup();
     }
@@ -471,7 +474,7 @@
   function chip({ label, active, onClick, avatar, title, count }) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'bb-chip';
+    button.className = avatar ? 'bb-chip bb-chip--avatar' : 'bb-chip';
     button.setAttribute('aria-pressed', String(active));
     if (title) button.title = title;
     if (avatar) {
@@ -490,6 +493,28 @@
       badge.textContent = count;
       button.append(badge);
     }
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  // Board / Standup reads as a two-state mode switch rather than a pair of
+  // actions, so both halves are always present and the current one is filled.
+  function modeSegment({ label, icon, active, disabled, extraClass, onClick }) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = extraClass ? `bb-mode ${extraClass}` : 'bb-mode';
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = Boolean(disabled);
+    if (icon) {
+      const glyph = document.createElement('span');
+      glyph.className = 'bb-mode-icon';
+      glyph.textContent = icon;
+      glyph.setAttribute('aria-hidden', 'true');
+      button.append(glyph);
+    }
+    const span = document.createElement('span');
+    span.textContent = label;
+    button.append(span);
     button.addEventListener('click', onClick);
     return button;
   }
@@ -538,83 +563,65 @@
     bar.style.marginLeft = anchorPadding.paddingLeft;
     bar.style.marginRight = anchorPadding.paddingRight;
 
-    // --- team members
+    // --- left: the team, or the person under discussion
     const people = document.createElement('div');
     people.className = 'bb-row';
 
-    const standupToggle = document.createElement('button');
-    standupToggle.type = 'button';
-    standupToggle.className = 'bb-standup-toggle';
-    standupToggle.classList.toggle('bb-standup-toggle--active', state.standup);
-    standupToggle.disabled = !state.standup && !state.members.length;
-
-    const standupIcon = document.createElement('span');
-    standupIcon.className = 'bb-standup-toggle-icon';
-    standupIcon.textContent = state.standup ? '■' : '▶';
-    standupIcon.setAttribute('aria-hidden', 'true');
-
-    const standupText = document.createElement('span');
-    standupText.textContent = state.standup ? 'Exit standup' : 'Standup mode';
-
-    standupToggle.append(standupIcon, standupText);
-    standupToggle.addEventListener('click', () => {
-      columnsMenuOpen = false;
-      if (state.standup) exitStandup();
-      else enterStandup();
-    });
+    const label = document.createElement('span');
+    label.className = 'bb-label';
+    label.textContent = state.standup ? 'Standup active' : 'Team';
+    people.append(label);
 
     if (state.standup) {
       const member = state.members[state.standupIndex];
-      const panel = document.createElement('div');
-      panel.className = 'bb-standup-panel';
 
       if (member) {
         const prevBtn = document.createElement('button');
         prevBtn.type = 'button';
         prevBtn.className = 'bb-standup-nav';
         prevBtn.textContent = '‹';
-        prevBtn.title = 'Previous person';
+        prevBtn.title = 'Previous person (left arrow)';
         prevBtn.addEventListener('click', () => standupStep(-1));
+
+        const who =
+          member.name && member.name !== member.login
+            ? `${member.name} (${member.login})`
+            : member.login;
+
+        const person = document.createElement('span');
+        person.className = 'bb-standup-person';
+        person.title = who;
 
         const img = document.createElement('img');
         img.className = 'bb-standup-avatar';
         img.src = member.avatarUrl || '';
         img.alt = '';
 
-        const info = document.createElement('div');
-        info.className = 'bb-standup-info';
-        const name = document.createElement('div');
-        name.className = 'bb-standup-name';
-        name.textContent = member.name && member.name !== member.login ? member.name : member.login;
-        const meta = document.createElement('div');
-        meta.className = 'bb-standup-meta';
-        meta.textContent =
-          `@${member.login} · ${state.standupIndex + 1} of ${state.members.length}` +
-          ' · press space for next';
-        info.append(name, meta);
+        const name = document.createElement('span');
+        name.textContent = member.login;
+        person.append(img, name);
 
         const nextBtn = document.createElement('button');
         nextBtn.type = 'button';
         nextBtn.className = 'bb-standup-nav';
         nextBtn.textContent = '›';
-        nextBtn.title = 'Next person (space)';
+        nextBtn.title = 'Next person (right arrow or space)';
         nextBtn.addEventListener('click', () => standupStep(1));
 
-        panel.append(prevBtn, img, info, nextBtn);
+        const meta = document.createElement('span');
+        meta.className = 'bb-standup-meta';
+        meta.textContent =
+          `${state.standupIndex + 1} of ${state.members.length}` +
+          ' · ← → or space to move through the team';
+
+        people.append(prevBtn, person, nextBtn, meta);
       } else {
         const empty = document.createElement('span');
         empty.className = 'bb-empty';
         empty.textContent = 'No assignees found on this board yet.';
-        panel.append(empty);
+        people.append(empty);
       }
-
-      people.append(panel, standupToggle);
     } else {
-      const label = document.createElement('span');
-      label.className = 'bb-label';
-      label.textContent = 'Team';
-      people.append(label);
-
       people.append(
         chip({
           label: 'Everyone',
@@ -667,74 +674,136 @@
         empty.textContent = 'No assignees found on this board yet.';
         people.append(empty);
       }
-
-      people.append(standupToggle);
     }
 
-    // --- columns
-    const columns = document.createElement('div');
-    columns.className = 'bb-row';
+    // --- right: column toggles and the mode switch
+    const actions = document.createElement('div');
+    actions.className = 'bb-actions';
 
-    const dropdown = document.createElement('div');
-    dropdown.className = 'bb-dropdown';
+    // Column toggles are a whole-board control, and standup is a stripped-back
+    // mode — it already hides GitHub's filter row and tabs — so they step out
+    // of the bar for its duration. Hidden columns stay hidden either way.
+    if (!state.standup) {
+      const dropdown = document.createElement('div');
+      dropdown.className = 'bb-dropdown';
 
-    const hiddenCount = state.hiddenColumns.size;
-    const dropdownToggle = document.createElement('button');
-    dropdownToggle.type = 'button';
-    dropdownToggle.className = 'bb-chip bb-dropdown-toggle';
-    dropdownToggle.setAttribute('aria-expanded', String(columnsMenuOpen));
-    dropdownToggle.textContent = hiddenCount ? `Columns (${hiddenCount} hidden)` : 'Columns';
-    dropdownToggle.addEventListener('click', (event) => {
-      event.stopPropagation();
-      columnsMenuOpen = !columnsMenuOpen;
-      renderBar({ force: true });
-    });
+      const hiddenCount = state.hiddenColumns.size;
+      const dropdownToggle = document.createElement('button');
+      dropdownToggle.type = 'button';
+      dropdownToggle.className = 'bb-columns-toggle';
+      dropdownToggle.setAttribute('aria-expanded', String(columnsMenuOpen));
+      dropdownToggle.title = hiddenCount
+        ? `${hiddenCount} of ${columnNames.length} columns hidden`
+        : 'Show or hide columns';
 
-    const menu = document.createElement('div');
-    menu.className = 'bb-dropdown-menu';
-    if (!columnsMenuOpen) menu.hidden = true;
+      const glyph = document.createElement('span');
+      glyph.className = 'bb-columns-glyph';
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.append(
+        document.createElement('span'),
+        document.createElement('span'),
+        document.createElement('span')
+      );
 
-    for (const name of columnNames) {
-      const visible = !state.hiddenColumns.has(name);
-      const item = document.createElement('label');
-      item.className = 'bb-dropdown-item';
+      const glyphText = document.createElement('span');
+      glyphText.textContent = 'Columns';
+      dropdownToggle.append(glyph, glyphText);
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = visible;
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) state.hiddenColumns.delete(name);
-        else state.hiddenColumns.add(name);
-        applyColumnVisibility();
+      if (hiddenCount) {
+        const badge = document.createElement('span');
+        badge.className = 'bb-columns-count';
+        badge.textContent = hiddenCount;
+        dropdownToggle.append(badge);
+      }
+
+      dropdownToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        columnsMenuOpen = !columnsMenuOpen;
         renderBar({ force: true });
-        saveState();
       });
 
-      const label = document.createElement('span');
-      label.textContent = name;
+      const menu = document.createElement('div');
+      menu.className = 'bb-dropdown-menu';
+      if (!columnsMenuOpen) menu.hidden = true;
 
-      item.append(checkbox, label);
-      menu.append(item);
+      for (const name of columnNames) {
+        const visible = !state.hiddenColumns.has(name);
+        const item = document.createElement('label');
+        item.className = 'bb-dropdown-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = visible;
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) state.hiddenColumns.delete(name);
+          else state.hiddenColumns.add(name);
+          applyColumnVisibility();
+          renderBar({ force: true });
+          saveState();
+        });
+
+        const itemLabel = document.createElement('span');
+        itemLabel.textContent = name;
+
+        item.append(checkbox, itemLabel);
+        menu.append(item);
+      }
+
+      if (hiddenCount) {
+        const showAll = document.createElement('button');
+        showAll.type = 'button';
+        showAll.className = 'bb-dropdown-showall';
+        showAll.textContent = 'Show all';
+        showAll.addEventListener('click', () => {
+          state.hiddenColumns.clear();
+          applyColumnVisibility();
+          renderBar({ force: true });
+          saveState();
+        });
+        menu.append(showAll);
+      }
+
+      dropdown.append(dropdownToggle, menu);
+
+      const divider = document.createElement('span');
+      divider.className = 'bb-divider';
+      divider.setAttribute('aria-hidden', 'true');
+
+      actions.append(dropdown, divider);
     }
 
-    if (state.hiddenColumns.size) {
-      const showAll = document.createElement('button');
-      showAll.type = 'button';
-      showAll.className = 'bb-dropdown-showall';
-      showAll.textContent = 'Show all';
-      showAll.addEventListener('click', () => {
-        state.hiddenColumns.clear();
-        applyColumnVisibility();
-        renderBar({ force: true });
-        saveState();
-      });
-      menu.append(showAll);
-    }
+    const modes = document.createElement('div');
+    modes.className = 'bb-modes';
+    modes.setAttribute('role', 'group');
+    modes.setAttribute('aria-label', 'Board mode');
 
-    dropdown.append(dropdownToggle, menu);
-    columns.append(dropdown);
+    modes.append(
+      modeSegment({
+        label: 'Board',
+        active: !state.standup,
+        onClick: () => {
+          if (!state.standup) return;
+          columnsMenuOpen = false;
+          exitStandup();
+        }
+      }),
+      modeSegment({
+        label: 'Standup',
+        icon: state.standup ? '▮▮' : '▶',
+        active: state.standup,
+        extraClass: 'bb-mode--standup',
+        disabled: !state.standup && !state.members.length,
+        onClick: () => {
+          if (state.standup) return;
+          columnsMenuOpen = false;
+          enterStandup();
+        }
+      })
+    );
 
-    bar.append(people, columns);
+    actions.append(modes);
+
+    bar.append(people, actions);
     if (!existing) anchor.insertAdjacentElement('afterend', bar);
   }
 
