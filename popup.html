@@ -26,6 +26,24 @@
         gap: 8px;
         cursor: pointer;
       }
+      label + label {
+        margin-top: 10px;
+      }
+      /* Hiding GitHub's controls only means anything while the extension is
+         running, so it reads as a child of the switch above it. */
+      .dependent {
+        margin-left: 22px;
+      }
+      .dependent.off {
+        color: #8c959f;
+        cursor: not-allowed;
+      }
+      .hint {
+        margin: 3px 0 0 44px;
+        color: #59636e;
+        font-size: 11px;
+        line-height: 1.4;
+      }
     </style>
   </head>
   <body>
@@ -35,6 +53,11 @@
       <input type="checkbox" id="enabled" />
       <span>Enabled</span>
     </label>
+    <label class="dependent" id="hide-controls-label">
+      <input type="checkbox" id="hide-controls" />
+      <span>Hide default filter controls</span>
+    </label>
+    <p class="hint">Hides GitHub's own search, assignee and view controls on board views.</p>
     <script src="popup.js"></script>
   </body>
 </html>

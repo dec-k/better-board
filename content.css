@@ -1,5 +1,5 @@
 [data-bb-hidden],
-[data-bb-standup-hidden] {
+[data-bb-chrome-hidden] {
   display: none !important;
 }
 
@@ -32,10 +32,10 @@
   font-size: 13px;
 }
 
-/* Standup hides GitHub's own filter row, which is what the bar normally sits
-   under — without that spacer it would butt straight up against the section
-   above, so it carries its own while the mode is on. */
-#better-board-bar.bb-standup {
+/* With GitHub's filter row hidden, the bar loses what it normally sits under
+   and would butt straight up against the section above, so it carries its own
+   spacer for as long as those controls are away. */
+#better-board-bar.bb-controls-hidden {
   margin-top: 8px;
 }
 

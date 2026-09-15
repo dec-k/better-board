@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "better-board",
   "version": "0.1.0",
-  "description": "Adds a team-member filter row and status column toggles to GitHub Projects board views.",
+  "description": "A more accessible standup view for GitHub Projects.",
   "permissions": ["storage"],
   "browser_specific_settings": {
     "gecko": {

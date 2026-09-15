@@ -4,7 +4,7 @@
   const BAR_ID = 'better-board-bar';
   const HIDDEN_ATTR = 'data-bb-hidden';
   const CHILD_ATTR = 'data-bb-child';
-  const STANDUP_HIDDEN_ATTR = 'data-bb-standup-hidden';
+  const CHROME_HIDDEN_ATTR = 'data-bb-chrome-hidden';
 
   // Firefox exposes the promise-based APIs as `browser`; Chrome and Edge as
   // `chrome`. Both return promises for the storage calls used here.
@@ -29,6 +29,7 @@
 
   const state = {
     enabled: true,
+    hideControls: false,
     assignees: new Set(),
     hiddenColumns: new Set(),
     members: [],
@@ -49,8 +50,13 @@
 
   async function loadState() {
     state.projectKey = projectKey();
-    const { enabled = true, projects = {} } = await ext.storage.sync.get(['enabled', 'projects']);
+    const {
+      enabled = true,
+      hideControls = false,
+      projects = {}
+    } = await ext.storage.sync.get(['enabled', 'hideControls', 'projects']);
     state.enabled = enabled;
+    state.hideControls = hideControls;
     const saved = projects[state.projectKey] || {};
     state.assignees = new Set(saved.assignees || []);
     state.hiddenColumns = new Set(saved.hiddenColumns || []);
@@ -386,12 +392,15 @@
     return markerEl;
   }
 
-  let standupHiddenEls = [];
+  let chromeHiddenEls = [];
 
-  function applyStandupChrome() {
-    for (const el of standupHiddenEls) el.removeAttribute(STANDUP_HIDDEN_ATTR);
-    standupHiddenEls = [];
-    if (!state.standup) return;
+  // GitHub's own filter row and view tabs. Hiding them is a setting rather than
+  // something standup does on its own, so it holds whatever mode the board is in
+  // — and it rides on the extension being enabled at all.
+  function applyChromeVisibility() {
+    for (const el of chromeHiddenEls) el.removeAttribute(CHROME_HIDDEN_ATTR);
+    chromeHiddenEls = [];
+    if (!state.enabled || !state.hideControls) return;
 
     const anchor = document.querySelector(SEL.filterRow) || document.querySelector(SEL.filterForm);
     if (!anchor) return;
@@ -401,8 +410,8 @@
     if (tablist) toHide.push(findSectionToHide(tablist, anchor));
 
     for (const el of toHide) {
-      el.setAttribute(STANDUP_HIDDEN_ATTR, '');
-      standupHiddenEls.push(el);
+      el.setAttribute(CHROME_HIDDEN_ATTR, '');
+      chromeHiddenEls.push(el);
     }
   }
 
@@ -421,13 +430,11 @@
     state.standup = true;
     state.standupDone = new Set();
     applyStandupSelection();
-    applyStandupChrome();
     renderBar({ force: true });
   }
 
   function exitStandup() {
     state.standup = false;
-    applyStandupChrome();
     renderBar({ force: true });
   }
 
@@ -597,6 +604,7 @@
       [...state.hiddenColumns].sort(),
       state.standup,
       state.standupIndex,
+      state.hideControls,
       [...state.standupDone].sort(),
       columnsMenuOpen
     ]);
@@ -605,7 +613,7 @@
 
     const bar = existing || document.createElement('div');
     bar.id = BAR_ID;
-    bar.classList.toggle('bb-standup', state.standup);
+    bar.classList.toggle('bb-controls-hidden', state.hideControls);
     bar.replaceChildren();
 
     // Line the bar up with the filter input above and the columns below, both
@@ -895,7 +903,7 @@
         seenMembers = new Map();
         state.standup = false;
         state.standupIndex = 0;
-        standupHiddenEls = [];
+        chromeHiddenEls = [];
         loadState().then(refresh);
         return;
       }
@@ -903,7 +911,7 @@
       if (!state.enabled) state.standup = false;
       renderBar();
       applyColumnVisibility();
-      applyStandupChrome();
+      applyChromeVisibility();
       applySubIssueNesting();
       syncAssigneesFromQuery();
     }, 50);
@@ -913,8 +921,9 @@
     if (changes.enabled) {
       state.enabled = changes.enabled.newValue;
       if (!state.enabled) state.standup = false;
-      refresh();
     }
+    if (changes.hideControls) state.hideControls = changes.hideControls.newValue;
+    if (changes.enabled || changes.hideControls) refresh();
   });
 
   loadState().then(() => {
@@ -926,7 +935,7 @@
       const external = records.some((r) => {
         if (ours && ours.contains(r.target)) return false;
         if (r.type === 'attributes' && r.attributeName === HIDDEN_ATTR) return false;
-        if (r.type === 'attributes' && r.attributeName === STANDUP_HIDDEN_ATTR) return false;
+        if (r.type === 'attributes' && r.attributeName === CHROME_HIDDEN_ATTR) return false;
         return true;
       });
       if (external) refresh();
@@ -935,7 +944,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: [HIDDEN_ATTR, STANDUP_HIDDEN_ATTR]
+      attributeFilter: [HIDDEN_ATTR, CHROME_HIDDEN_ATTR]
     });
   });
 })();
