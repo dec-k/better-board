@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "description": "A more accessible standup view for GitHub Projects.",
   "permissions": ["storage"],
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "better-board@dec.keighley",
@@ -15,7 +21,13 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "better-board"
+    "default_title": "better-board",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "content_scripts": [
     {
