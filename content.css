@@ -1,5 +1,5 @@
 [data-bb-hidden],
-[data-bb-standup-hidden] {
+[data-bb-chrome-hidden] {
   display: none !important;
 }
 
@@ -15,17 +15,28 @@
   border-bottom-left-radius: 2px;
 }
 
+/* One row: the team on the left, controls on the right. Colours come from
+   GitHub's own CSS variables so the bar follows the active theme; the hex
+   fallbacks are the light-mode values the design was drawn against. */
 #better-board-bar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   /* Horizontal margins are overwritten from the anchor's own padding. */
   margin: 0 16px 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--borderColor-default, #d1d9e0);
   border-radius: 8px;
-  background: var(--bgColor-muted, #f6f8fa);
-  font-size: 12px;
+  background: var(--bgColor-default, #ffffff);
+  font-size: 13px;
+}
+
+/* With GitHub's filter row hidden, the bar loses what it normally sits under
+   and would butt straight up against the section above, so it carries its own
+   spacer for as long as those controls are away. */
+#better-board-bar.bb-controls-hidden {
+  margin-top: 8px;
 }
 
 #better-board-bar .bb-row {
@@ -33,15 +44,14 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
-#better-board-bar .bb-label {
-  min-width: 62px;
-  color: var(--fgColor-muted, #59636e);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
+#better-board-bar .bb-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 
 #better-board-bar .bb-empty {
@@ -51,15 +61,25 @@
 #better-board-bar .bb-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
   border: 1px solid var(--borderColor-default, #d1d9e0);
   border-radius: 999px;
   background: var(--bgColor-default, #ffffff);
   color: var(--fgColor-default, #1f2328);
   font: inherit;
-  line-height: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+/* An avatar sits tight against the chip's leading edge. */
+#better-board-bar .bb-chip--avatar {
+  gap: 7px;
+  padding-left: 5px;
 }
 
 #better-board-bar .bb-chip:hover {
@@ -73,16 +93,43 @@
   font-weight: 600;
 }
 
+/* Standup keeps the whole team visible, so everyone but the person speaking
+   is muted rather than faded — opacity would take the tick down with it. */
+#better-board-bar .bb-chip--dim {
+  border-color: var(--borderColor-muted, #d8dee4);
+  background: var(--bgColor-muted, #f6f8fa);
+  color: var(--fgColor-muted, #59636e);
+}
+
+#better-board-bar .bb-chip--dim .bb-avatar {
+  opacity: 0.55;
+}
+
+#better-board-bar .bb-chip--dim:hover {
+  border-color: var(--borderColor-default, #d1d9e0);
+  background: var(--bgColor-neutral-muted, #eff2f5);
+  color: var(--fgColor-default, #1f2328);
+}
+
+#better-board-bar .bb-chip--dim:hover .bb-avatar {
+  opacity: 1;
+}
+
+#better-board-bar .bb-check {
+  color: var(--fgColor-success, #1a7f37);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 #better-board-bar .bb-count {
-  min-width: 16px;
-  padding: 0 4px;
+  min-width: 18px;
+  padding: 1px 7px;
   border-radius: 999px;
   background: var(--bgColor-neutral-muted, #eff2f5);
   color: var(--fgColor-muted, #59636e);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 15px;
   text-align: center;
 }
 
@@ -92,72 +139,85 @@
 }
 
 #better-board-bar .bb-avatar {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-#better-board-bar .bb-standup-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  padding: 4px 12px;
-  border: 1px solid var(--borderColor-accent-emphasis, #0969da);
-  border-radius: 999px;
-  background: var(--bgColor-accent-emphasis, #0969da);
-  color: var(--fgColor-onEmphasis, #ffffff);
-  font: inherit;
-  font-weight: 600;
-  line-height: 18px;
-  cursor: pointer;
+#better-board-bar .bb-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--borderColor-default, #d1d9e0);
+  flex-shrink: 0;
 }
 
-#better-board-bar .bb-standup-toggle:hover {
-  background: var(--button-primary-hoverBg, #0860ca);
-}
-
-#better-board-bar .bb-standup-toggle:disabled {
-  border-color: var(--borderColor-default, #d1d9e0);
-  background: var(--bgColor-disabled, #eff2f5);
-  color: var(--fgColor-disabled, #8c959f);
-  cursor: not-allowed;
-}
-
-#better-board-bar .bb-standup-toggle--active {
-  border-color: var(--borderColor-danger-emphasis, #cf222e);
-  background: var(--bgColor-danger-emphasis, #cf222e);
-}
-
-#better-board-bar .bb-standup-toggle--active:hover {
-  background: var(--button-danger-hoverBg, #a40e26);
-}
-
-#better-board-bar .bb-standup-toggle-icon {
-  font-size: 9px;
-}
+/* ------------------------------------------------------------- columns */
 
 #better-board-bar .bb-dropdown {
   position: relative;
 }
 
-#better-board-bar .bb-dropdown-toggle {
+#better-board-bar .bb-columns-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  background: var(--bgColor-default, #ffffff);
+  color: var(--fgColor-default, #1f2328);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-#better-board-bar .bb-dropdown-toggle::after {
+#better-board-bar .bb-columns-toggle:hover {
+  background: var(--bgColor-neutral-muted, #eff2f5);
+}
+
+#better-board-bar .bb-columns-toggle::after {
   content: '▾';
-  font-size: 9px;
-  opacity: 0.7;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 10px;
 }
 
-#better-board-bar .bb-dropdown-toggle[aria-expanded='true'] {
+#better-board-bar .bb-columns-toggle[aria-expanded='true'] {
   border-color: var(--borderColor-accent-emphasis, #0969da);
-  background: var(--bgColor-accent-muted, #ddf4ff);
-  color: var(--fgColor-accent, #0969da);
+}
+
+/* Three bars with the last dimmed — a board with a column held back. */
+#better-board-bar .bb-columns-glyph {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+#better-board-bar .bb-columns-glyph span {
+  display: block;
+  width: 3px;
+  height: 12px;
+  background: var(--fgColor-muted, #424a53);
+}
+
+#better-board-bar .bb-columns-glyph span:last-child {
+  background: var(--borderColor-emphasis, #c8d1d9);
+}
+
+#better-board-bar .bb-columns-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bgColor-accent-emphasis, #0969da);
+  color: var(--fgColor-onEmphasis, #ffffff);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 #better-board-bar .bb-dropdown-menu {
@@ -184,7 +244,7 @@
   padding: 4px 6px;
   border-radius: 6px;
   color: var(--fgColor-default, #1f2328);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -196,71 +256,95 @@
   margin: 0;
 }
 
-#better-board-bar .bb-dropdown-showall {
-  margin-top: 4px;
-  padding: 5px 6px;
-  border: none;
-  border-top: 1px solid var(--borderColor-muted, #d1d9e0);
-  border-radius: 0;
-  background: none;
-  color: var(--fgColor-accent, #0969da);
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-#better-board-bar .bb-dropdown-showall:hover {
-  background: var(--bgColor-accent-muted, #ddf4ff);
-}
-
-#better-board-bar .bb-standup-panel {
+#better-board-bar .bb-dropdown-actions {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--borderColor-muted, #d1d9e0);
+}
+
+#better-board-bar .bb-dropdown-action {
   flex: 1;
-}
-
-#better-board-bar .bb-standup-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-#better-board-bar .bb-standup-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-#better-board-bar .bb-standup-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--fgColor-default, #1f2328);
-}
-
-#better-board-bar .bb-standup-meta {
-  color: var(--fgColor-muted, #59636e);
-  font-size: 11px;
-}
-
-#better-board-bar .bb-standup-nav {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+  padding: 5px 6px;
   border: 1px solid var(--borderColor-default, #d1d9e0);
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--bgColor-default, #ffffff);
   color: var(--fgColor-default, #1f2328);
-  font-size: 15px;
-  line-height: 1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  flex-shrink: 0;
 }
 
-#better-board-bar .bb-standup-nav:hover {
+#better-board-bar .bb-dropdown-action:hover:not(:disabled) {
   background: var(--bgColor-neutral-muted, #eff2f5);
+}
+
+#better-board-bar .bb-dropdown-action:disabled {
+  color: var(--fgColor-disabled, #8c959f);
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------- mode switch */
+
+#better-board-bar .bb-modes {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--bgColor-neutral-muted, #eff2f5);
+}
+
+#better-board-bar .bb-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fgColor-muted, #424a53);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#better-board-bar .bb-mode:hover:not([aria-pressed='true']):not(:disabled) {
+  color: var(--fgColor-default, #1f2328);
+}
+
+#better-board-bar .bb-mode:disabled {
+  color: var(--fgColor-disabled, #8c959f);
+  cursor: not-allowed;
+}
+
+#better-board-bar .bb-mode[aria-pressed='true'] {
+  background: var(--bgColor-default, #ffffff);
+  color: var(--fgColor-default, #1f2328);
+  box-shadow: 0 1px 0 rgba(31, 35, 40, 0.08);
+}
+
+#better-board-bar .bb-mode--standup[aria-pressed='true'] {
+  background: var(--bgColor-accent-emphasis, #0969da);
+  color: var(--fgColor-onEmphasis, #ffffff);
+}
+
+#better-board-bar .bb-mode-icon {
+  font-size: 9px;
+}
+
+/* ------------------------------------------------------- standup active */
+
+#better-board-bar .bb-standup-meta {
+  margin-left: 2px;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 13px;
+  white-space: nowrap;
 }
